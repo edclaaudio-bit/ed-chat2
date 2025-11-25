@@ -1,30 +1,59 @@
-'use client';
-import { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabaseClient';
-import { useRouter } from 'next/navigation';
+"use client";
 
-export default function ChatIndex(){
-  const [rooms, setRooms] = useState([]);
-  const router = useRouter();
+import { useState, useEffect } from "react";
+import { supabase } from "../../lib/supabaseClient";
+
+export default function ChatPage() {
+  const [messages, setMessages] = useState([]);
+  const [text, setText] = useState("");
 
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase.from('rooms').select('*').order('created_at', { ascending: true });
-      setRooms(data || []);
-    }
-    load();
+    fetchMessages();
+
+    const subscription = supabase
+      .channel("public:messages")
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, (payload) => {
+        fetchMessages();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
+  async function fetchMessages() {
+    const { data } = await supabase.from("messages").select("*").order("id");
+    setMessages(data);
+  }
+
+  async function sendMessage() {
+    if (!text.trim()) return;
+
+    await supabase.from("messages").insert({ content: text });
+
+    setText("");
+  }
+
   return (
-    <main>
-      <h2>Salas</h2>
-      <ul>
-        {rooms.map(r => (
-          <li key={r.id}>
-            <a href={`/chat/${r.id}`}>{r.name}</a>
-          </li>
+    <div style={{ padding: 20 }}>
+      <h1>💬 Chat Online</h1>
+
+      <div style={{ border: "1px solid #ccc", height: 300, overflow: "auto", padding: 10, marginBottom: 20 }}>
+        {messages?.map((msg) => (
+          <p key={msg.id}>• {msg.content}</p>
         ))}
-      </ul>
-    </main>
+      </div>
+
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Digite sua mensagem..."
+        style={{ padding: 10, width: "70%" }}
+      />
+      <button onClick={sendMessage} style={{ padding: "10px 20px", marginLeft: 10 }}>
+        Enviar
+      </button>
+    </div>
   );
 }
