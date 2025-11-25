@@ -13,3 +13,6 @@
     "firebase": "10.8.0"
   }
 }
+"dependencies": {
+  "@supabase/supabase-js": "2.39.7"
+}
